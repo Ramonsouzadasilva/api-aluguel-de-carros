@@ -25,7 +25,6 @@ public class CarroController {
         return ResponseEntity.ok(carroService.listarCarrosComFiltrosLike(ano, modelo, descricao));
     }
 
-
     @GetMapping("/disponiveis")
     public ResponseEntity<List<CarroResponse>> listarCarrosDisponiveis() {
         List<CarroResponse> carros = carroService.listarCarrosDisponiveis();

@@ -6,15 +6,17 @@ import com.AluguelDeCarros.dto.reserva.ReservaResponse;
 import com.AluguelDeCarros.entity.Carro;
 import com.AluguelDeCarros.entity.Reserva;
 import com.AluguelDeCarros.entity.TipoSeguro;
+import com.AluguelDeCarros.entity.user.User;
 import com.AluguelDeCarros.repository.CarroRepository;
 import com.AluguelDeCarros.repository.ReservaRepository;
+import com.AluguelDeCarros.repository.authorization.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 
 import java.util.Date;
 import java.util.List;
-import java.util.Optional;
 
 @Service
 @RequiredArgsConstructor
@@ -24,46 +26,8 @@ public class ReservaService {
     private ReservaRepository reservaRepository;
     @Autowired
     private CarroRepository carroRepository;
-
-    public ReservaResponse reservarCarro(ReservaRequest request) {
-        Carro carro = carroRepository.findById(request.carroId())
-                .orElseThrow(() -> new RuntimeException("Carro não encontrado"));
-
-        System.out.println(carro);
-
-        List<Reserva> reservas = reservaRepository.findByCarroAndDataDeSaidaAfterAndDataDeEntradaBefore(
-                carro, request.dataDeEntrada(), request.dataDeSaida());
-
-        if (!reservas.isEmpty()) {
-            throw new RuntimeException("Carro já reservado nesse período");
-        }
-
-        long totalDeDias = calcularTotalDeDias(request.dataDeEntrada(), request.dataDeSaida());
-        double valorTotalDoAluguel = calcularValorTotalAluguel(carro.getValorDaDiaria(), totalDeDias);
-        double valorAdicionalDoSeguro = calcularAdicionalDoSeguro(valorTotalDoAluguel, request.tipoSeguro());
-
-        Reserva reserva = new Reserva();
-        reserva.setDataDeEntrada(request.dataDeEntrada());
-        reserva.setDataDeSaida(request.dataDeSaida());
-        reserva.setCarro(carro);
-        reserva.setValorTotalDoAluguel(valorTotalDoAluguel + valorAdicionalDoSeguro);
-        reserva.setValorAdicionalDoSeguro(valorAdicionalDoSeguro);
-        reserva.setTotalDeDias(totalDeDias);
-        reserva.setTipoSeguro(request.tipoSeguro());
-
-        carro.setDisponivel(false);
-        reserva = reservaRepository.save(reserva);
-
-        return new ReservaResponse(
-                reserva.getDataDeEntrada(),
-                reserva.getDataDeSaida(),
-                new CarroReservadoResponse(carro.getModelo(), carro.getAno(), carro.getValorDaDiaria()),
-                reserva.getValorTotalDoAluguel(),
-                reserva.getValorAdicionalDoSeguro(),
-                reserva.getTotalDeDias(),
-                reserva.getTipoSeguro()
-        );
-    }
+    @Autowired
+    private UserRepository userRepository;
 
     private long calcularTotalDeDias(Date dataDeEntrada, Date dataDeSaida) {
         if (dataDeSaida.before(dataDeEntrada)) {
@@ -91,8 +55,54 @@ public class ReservaService {
         return adicional;
     }
 
+    public ReservaResponse reservarCarro(ReservaRequest request) {
+        String username = SecurityContextHolder.getContext().getAuthentication().getName();
+        User user = (User) userRepository.findByLogin(username);
+
+        Carro carro = carroRepository.findById(request.carroId())
+                .orElseThrow(() -> new RuntimeException("Carro não encontrado"));
+
+        List<Reserva> reservas = reservaRepository.findByCarroAndDataDeSaidaAfterAndDataDeEntradaBefore(
+                carro, request.dataDeEntrada(), request.dataDeSaida());
+
+        if (!reservas.isEmpty()) {
+            throw new RuntimeException("Carro já reservado nesse período");
+        }
+
+        double valorDiaria = carro.getValorDaDiaria();
+        long totalDeDias = calcularTotalDeDias(request.dataDeEntrada(), request.dataDeSaida());
+        double valorTotalDoAluguel = calcularValorTotalAluguel(valorDiaria, totalDeDias);
+        double valorAdicionalDoSeguro = calcularAdicionalDoSeguro(valorTotalDoAluguel, request.tipoSeguro());
+
+        Reserva reserva = new Reserva();
+        reserva.setDataDeEntrada(request.dataDeEntrada());
+        reserva.setDataDeSaida(request.dataDeSaida());
+        reserva.setCarro(carro);
+        reserva.setValorTotalDoAluguel(valorTotalDoAluguel + valorAdicionalDoSeguro);
+        reserva.setValorAdicionalDoSeguro(valorAdicionalDoSeguro);
+        reserva.setTotalDeDias(totalDeDias);
+        reserva.setTipoSeguro(request.tipoSeguro());
+        reserva.setUser(user);
+
+        carro.setDisponivel(false);
+        reserva = reservaRepository.save(reserva);
+
+        return new ReservaResponse(
+                reserva.getDataDeEntrada(),
+                reserva.getDataDeSaida(),
+                new CarroReservadoResponse(carro.getModelo(), carro.getAno(), carro.getValorDaDiaria()),
+                reserva.getValorTotalDoAluguel(),
+                reserva.getValorAdicionalDoSeguro(),
+                reserva.getTotalDeDias(),
+                reserva.getTipoSeguro()
+        );
+    }
+
     public List<ReservaResponse> listarReservas() {
-        List<Reserva> reservas = reservaRepository.findAll();
+        String username = SecurityContextHolder.getContext().getAuthentication().getName();
+        User user = (User) userRepository.findByLogin(username);
+//        List<Reserva> reservas = reservaRepository.findAll();
+        List<Reserva> reservas = reservaRepository.findByUser(user);
 
         return reservas.stream()
                 .map(reserva -> {
@@ -114,7 +124,8 @@ public class ReservaService {
         reservaRepository.deleteById(id);
     }
 
-    public ReservaResponse atualizarDatasECarro(Long reservaId, Date dataDeEntrada, Date dataDeSaida, String modeloCarro) {
+    public ReservaResponse atualizarDatasECarro(Long reservaId, Date dataDeEntrada,
+                                                Date dataDeSaida, String modeloCarro) {
         Reserva reserva = reservaRepository.findById(reservaId)
                 .orElseThrow(() -> new RuntimeException("Reserva não encontrada"));
 

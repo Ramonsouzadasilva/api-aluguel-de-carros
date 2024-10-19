@@ -3,6 +3,7 @@ package com.AluguelDeCarros.service;
 import com.AluguelDeCarros.dto.carro.CarroRequest;
 import com.AluguelDeCarros.dto.carro.CarroResponse;
 import com.AluguelDeCarros.entity.Carro;
+import com.AluguelDeCarros.exceptions.CarroNotFoundException;
 import com.AluguelDeCarros.repository.CarroRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -43,7 +44,8 @@ public class CarroService {
 
     public CarroResponse atualizarCarro(Long id, CarroRequest request) {
         Carro carro = carroRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Carro não encontrado com ID: " + id));
+                .orElseThrow(() ->  new CarroNotFoundException(id));
+
         carro.setMarca(request.marca());
         carro.setAno(request.ano());
         carro.setModelo(request.modelo());

@@ -7,6 +7,7 @@ import com.AluguelDeCarros.entity.Carro;
 import com.AluguelDeCarros.entity.Reserva;
 import com.AluguelDeCarros.entity.TipoSeguro;
 import com.AluguelDeCarros.entity.user.User;
+import com.AluguelDeCarros.exceptions.ReservaException;
 import com.AluguelDeCarros.repository.CarroRepository;
 import com.AluguelDeCarros.repository.ReservaRepository;
 import com.AluguelDeCarros.repository.authorization.UserRepository;
@@ -66,7 +67,7 @@ public class ReservaService {
                 carro, request.dataDeEntrada(), request.dataDeSaida());
 
         if (!reservas.isEmpty()) {
-            throw new RuntimeException("Carro já reservado nesse período");
+            throw new ReservaException("Carro já reservado nesse período");
         }
 
         double valorDiaria = carro.getValorDaDiaria();

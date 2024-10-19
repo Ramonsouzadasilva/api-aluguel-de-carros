@@ -27,7 +27,7 @@ public class Reserva {
     @JoinColumn(name = "userId")
     private User user;
 
-   private double valorTotalDoAluguel;
+    private double valorTotalDoAluguel;
     private double ValorAdicionalDoSeguro;
     private Long totalDeDias;
 
